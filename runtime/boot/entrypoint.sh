@@ -1,18 +1,9 @@
-#!/bin/bash
-#
-# ** THIS IS AN AUTO-GENERATED FILE **
-#
+#!/usr/bin/env bash
+set -euxo pipefail
 
-# Run Kibana, using environment variables to set longopts defining Kibana's
-# configuration.
-#
-# eg. Setting the environment variable:
-#
-#       ELASTICSEARCH_STARTUPTIMEOUT=60
-#
-# will cause Kibana to be invoked with:
-#
-#       --elasticsearch.startupTimeout=60
+LOGGING_DEST=/dev/stdout
+PID_FILE=/data/kibana.pid
+PATH_DATA=/data/data
 
 kibana_vars=(
     console.enabled
@@ -158,10 +149,6 @@ kibana_vars=(
     xpack.security.public.port
     xpack.telemetry.enabled
 )
-
-LOGGING_DEST=/dev/stdout
-PID_FILE=/data/kibana.pid
-PATH_DATA=/data/data
 
 longopts=''
 for kibana_var in ${kibana_vars[*]}; do

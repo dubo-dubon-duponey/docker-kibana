@@ -13,7 +13,7 @@ VENDOR="${VENDOR:-dubodubonduponey}"
 IMAGE_TAG="${IMAGE_TAG:-v1}"
 
 # Configurable, with sane defaults for this image
-PLATFORMS="${PLATFORMS:-linux/amd64,linux/arm64,linux/arm/v7}" # ,linux/arm/v6
+PLATFORMS="${PLATFORMS:-linux/amd64}
 
 # Behavioral overrides
 [ "$NO_PUSH" ] || PUSH=--push
