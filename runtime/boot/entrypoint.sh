@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-set -euxo pipefail
+set -o errexit -o errtrace -o functrace -o nounset -o pipefail
 
-LOGGING_DEST=/dev/stdout
-PID_FILE=/data/kibana.pid
-PATH_DATA=/data/data
+export LOGGING_DEST=/dev/stdout
+export PID_FILE=/data/kibana.pid
+export PATH_DATA=/data/data
 
 kibana_vars=(
     console.enabled
