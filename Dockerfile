@@ -23,7 +23,8 @@ ENV           KBN_AMD64_SHA512=6c0fe42299a868b9091da9e8326b4242f843a68b9f5e032a1
 
 WORKDIR       /build/kibana
 
-RUN           set -Eeu; \
+# hadolint ignore=DL4006
+RUN           set -eu; \
               checksum=$KBN_AMD64_SHA512; \
               curl -k -fsSL -o kbn.tgz "https://artifacts.elastic.co/downloads/kibana/kibana-${KBN_VERSION}-linux-x86_64.tar.gz"; \
               printf "%s *kbn.tgz" "$checksum" | sha512sum -c -; \
@@ -33,21 +34,6 @@ RUN           set -Eeu; \
               rm config/kibana.yml; \
               ln -s /usr/bin/node node/bin/node; \
               ln -s /config/kibana.yml config/kibana.yml
-
-#######################
-# Extra builder for healthchecker
-#######################
-FROM          --platform=$BUILDPLATFORM dubodubonduponey/base:builder         AS builder-healthcheck
-
-ARG           HEALTH_VER=51ebf8ca3d255e0c846307bf72740f731e6210c3
-
-WORKDIR       $GOPATH/src/github.com/dubo-dubon-duponey/healthcheckers
-RUN           git clone git://github.com/dubo-dubon-duponey/healthcheckers .
-RUN           git checkout $HEALTH_VER
-RUN           arch="${TARGETPLATFORM#*/}"; \
-              env GOOS=linux GOARCH="${arch%/*}" go build -v -ldflags "-s -w" -o /dist/bin/http-health ./cmd/http
-
-RUN           chmod 555 /dist/bin/*
 
 #######################
 # Running image
