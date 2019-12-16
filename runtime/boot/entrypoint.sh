@@ -157,7 +157,7 @@ for kibana_var in ${kibana_vars[*]}; do
 
     # Indirectly lookup env var values via the name of the var.
     # REF: http://tldp.org/LDP/abs/html/bashver2.html#EX78
-    value=${!env_var}
+    value=${!env_var:-}
     if [[ -n $value ]]; then
       longopt="--${kibana_var}=${value}"
       longopts+=" ${longopt}"
