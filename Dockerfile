@@ -1,7 +1,10 @@
 #######################
 # Extra builder for healthchecker
 #######################
-FROM          --platform=$BUILDPLATFORM dubodubonduponey/base:builder                                                   AS builder-healthcheck
+ARG           BUILDER_BASE=dubodubonduponey/base:builder
+ARG           RUNTIME_BASE=dubodubonduponey/base:runtime
+# hadolint ignore=DL3006
+FROM          --platform=$BUILDPLATFORM $BUILDER_BASE                                                                   AS builder-healthcheck
 
 ARG           HEALTH_VER=51ebf8ca3d255e0c846307bf72740f731e6210c3
 
@@ -14,7 +17,8 @@ RUN           arch="${TARGETPLATFORM#*/}"; \
 #######################
 # Building image
 #######################
-FROM          dubodubonduponey/base:builder                                                                             AS builder
+# hadolint ignore=DL3006
+FROM          $BUILDER_BASE                                                                                             AS builder
 
 ENV           KBN_VERSION=7.5.0
 ENV           KBN_AMD64_SHA512=7c99c54bd8d34b707e788702e5a1a570e9504822af77d7b7d0ab3e80048be673c342953551508afc93c2b58aa78ec3cc68939b893601a94bd4ccaa206c9804bb
@@ -24,8 +28,8 @@ WORKDIR       /dist/boot
 # hadolint ignore=DL4006
 RUN           set -eu; \
               checksum=$KBN_AMD64_SHA512; \
-              curl -k -fsSL -o archive.tgz "https://artifacts.elastic.co/downloads/kibana/kibana-${KBN_VERSION}-linux-x86_64.tar.gz"; \
-              printf "Downloaded shasum: %s\n" $(sha512sum archive.tgz); \
+              curl -k -fsSL -o archive.tgz https://artifacts.elastic.co/downloads/kibana/kibana-"${KBN_VERSION}"-linux-x86_64.tar.gz; \
+              printf "Downloaded shasum: %s\n" "$(sha512sum archive.tgz)"; \
               printf "%s *archive.tgz" "$checksum" | sha512sum -c -; \
               tar --strip-components=1 -zxf archive.tgz; \
               rm archive.tgz; \
@@ -40,7 +44,8 @@ RUN           chmod 555 /dist/boot/bin/*
 #######################
 # Running image
 #######################
-FROM          dubodubonduponey/base:runtime
+# hadolint ignore=DL3006
+FROM          $RUNTIME_BASE
 
 USER          root
 
