@@ -72,7 +72,8 @@ ENV           SERVER_NAME kibana
 ENV           SERVER_HOST kibana
 ENV           ELASTICSEARCH_HOSTS "http://elasticsearch:9200"
 # xpack.monitoring.ui.container.elasticsearch.enabled: true
-ENV           HEALTHCHECK_URL="http://127.0.0.1:5601"
+# XXX this won't work as kibana apparently no longer binds on localhost
+ENV           HEALTHCHECK_URL="http://127.0.0.1:5601/api/status?healthcheck"
 
 # Default volumes for data
 VOLUME        /data
