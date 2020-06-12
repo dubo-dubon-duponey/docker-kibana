@@ -13,7 +13,7 @@ WORKDIR       $GOPATH/src/$GIT_REPO
 RUN           git clone git://$GIT_REPO .
 RUN           git checkout $GIT_VERSION
 RUN           arch="${TARGETPLATFORM#*/}"; \
-              env GOOS=linux GOARCH="${arch%/*}" go build -mod=vendor -v -ldflags "-s -w" -o /dist/boot/bin/http-health ./cmd/http
+              env GOOS=linux GOARCH="${arch%/*}" go build -v -ldflags "-s -w" -o /dist/boot/bin/http-health ./cmd/http
 
 #######################
 # Building image
@@ -23,6 +23,10 @@ FROM          $BUILDER_BASE                                                     
 
 ENV           KBN_VERSION=7.5.0
 ENV           KBN_AMD64_SHA512=7c99c54bd8d34b707e788702e5a1a570e9504822af77d7b7d0ab3e80048be673c342953551508afc93c2b58aa78ec3cc68939b893601a94bd4ccaa206c9804bb
+
+RUN           apt-get update -qq \
+              && apt-get install -qq --no-install-recommends \
+                curl=7.64.0-4+deb10u1
 
 WORKDIR       /dist/boot
 
@@ -52,7 +56,7 @@ USER          root
 
 RUN           apt-get update -qq          && \
               apt-get install -qq --no-install-recommends \
-                nodejs=10.15.2~dfsg-2 \
+                nodejs=10.19.0~dfsg1-1 \
                 fontconfig=2.13.1-2 \
                 libfreetype6=2.9.1-3+deb10u1      && \
               apt-get -qq autoremove      && \
