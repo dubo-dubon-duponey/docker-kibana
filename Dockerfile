@@ -23,8 +23,12 @@ RUN           arch="${TARGETPLATFORM#*/}"; \
 # hadolint ignore=DL3006
 FROM          $BUILDER_BASE                                                                                             AS builder
 
-ENV           KBN_VERSION=7.5.0
-ENV           KBN_AMD64_SHA512=7c99c54bd8d34b707e788702e5a1a570e9504822af77d7b7d0ab3e80048be673c342953551508afc93c2b58aa78ec3cc68939b893601a94bd4ccaa206c9804bb
+# ENV           KBN_VERSION=7.5.0
+#ENV           KBN_AMD64_SHA512=7c99c54bd8d34b707e788702e5a1a570e9504822af77d7b7d0ab3e80048be673c342953551508afc93c2b58aa78ec3cc68939b893601a94bd4ccaa206c9804bb
+#ENV           KBN_VERSION=7.5.2
+#ENV           KBN_AMD64_SHA512=7717eabe15a2ccd50cdc2acce592fc60af303516af2337145ab59be901d781e6545503a969ff7147e71e7189404ecbc870898daa92292e42002390f65e7cae41
+ENV           KBN_VERSION=7.7.1
+ENV           KBN_AMD64_SHA512=d3bc9257e04cfe1691756b29793ba7fb1affa742e70689045c0d023edf5db7968e3bdb874976c78ae19446cd2de12179adead059c7fc8b134405e3de0305b8f5
 
 RUN           apt-get update -qq \
               && apt-get install -qq --no-install-recommends \
@@ -84,6 +88,9 @@ ENV           HEALTHCHECK_URL="http://127.0.0.1:5601/api/status?healthcheck"
 
 # Default volumes for data
 VOLUME        /data
+
+# From 7.5, it seems now this is needed for /tmp/chromium-XXXXXX
+VOLUME        /tmp
 # XXX eff you kbn
 VOLUME        /boot/optimize
 
