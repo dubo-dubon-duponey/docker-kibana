@@ -62,7 +62,7 @@ USER          root
 
 RUN           apt-get update -qq          && \
               apt-get install -qq --no-install-recommends \
-                nodejs=10.19.0~dfsg1-1 \
+                nodejs=10.21.0~dfsg-1~deb10u1 \
                 fontconfig=2.13.1-2 \
                 libfreetype6=2.9.1-3+deb10u1      && \
               apt-get -qq autoremove      && \
