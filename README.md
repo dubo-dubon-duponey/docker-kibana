@@ -34,7 +34,7 @@ docker run -d \
     --net bridge \
     --cap-drop ALL \
     --read-only \
-    dubodubonduponey/kibana:v1
+    dubodubonduponey/kibana
 ```
 
 ## Notes
