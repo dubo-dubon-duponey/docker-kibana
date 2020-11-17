@@ -4,7 +4,7 @@ ARG           RUNTIME_BASE=dubodubonduponey/base:runtime
 #######################
 # Extra builder for healthchecker
 #######################
-# hadolint ignore=DL3006
+# hadolint ignore=DL3006,DL3029
 FROM          --platform=$BUILDPLATFORM $BUILDER_BASE                                                                   AS builder-healthcheck
 
 ARG           GIT_REPO=github.com/dubo-dubon-duponey/healthcheckers
@@ -29,7 +29,9 @@ FROM          $BUILDER_BASE                                                     
 #ENV           KBN_AMD64_SHA512=7717eabe15a2ccd50cdc2acce592fc60af303516af2337145ab59be901d781e6545503a969ff7147e71e7189404ecbc870898daa92292e42002390f65e7cae41
 #ENV           KBN_VERSION=7.7.1
 #ENV           KBN_AMD64_SHA512=d3bc9257e04cfe1691756b29793ba7fb1affa742e70689045c0d023edf5db7968e3bdb874976c78ae19446cd2de12179adead059c7fc8b134405e3de0305b8f5
-ENV           KBN_VERSION=7.8.1
+#ENV           KBN_VERSION=7.8.1
+#ENV           KBN_AMD64_SHA512=92f3717b2f9ea915570ee8587f1ad0c2a428c266e1cd7dcda485b8b81191c5c1b3155872299c56dbba8de93807b2cc67a0d197ecb2e8df44e09060d4fac1d759
+ENV           KBN_VERSION=7.10.0
 ENV           KBN_AMD64_SHA512=92f3717b2f9ea915570ee8587f1ad0c2a428c266e1cd7dcda485b8b81191c5c1b3155872299c56dbba8de93807b2cc67a0d197ecb2e8df44e09060d4fac1d759
 
 RUN           apt-get update -qq \
