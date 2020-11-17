@@ -32,7 +32,7 @@ FROM          $BUILDER_BASE                                                     
 #ENV           KBN_VERSION=7.8.1
 #ENV           KBN_AMD64_SHA512=92f3717b2f9ea915570ee8587f1ad0c2a428c266e1cd7dcda485b8b81191c5c1b3155872299c56dbba8de93807b2cc67a0d197ecb2e8df44e09060d4fac1d759
 ENV           KBN_VERSION=7.10.0
-ENV           KBN_AMD64_SHA512=92f3717b2f9ea915570ee8587f1ad0c2a428c266e1cd7dcda485b8b81191c5c1b3155872299c56dbba8de93807b2cc67a0d197ecb2e8df44e09060d4fac1d759
+ENV           KBN_AMD64_SHA512=385fe5d875ba074e0931a1e9ebbac8e3d91d300ca478f589da06b01c68e4694c5953a538afd6c385bdccec0f0d3cda1a5dc39f1b56e41d584cdcab8fba466677
 
 RUN           apt-get update -qq \
               && apt-get install -qq --no-install-recommends \
