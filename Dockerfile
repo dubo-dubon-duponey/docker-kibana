@@ -4,7 +4,7 @@ ARG           RUNTIME_BASE=dubodubonduponey/base:runtime
 #######################
 # Extra builder for healthchecker
 #######################
-# hadolint ignore=DL3006
+# hadolint ignore=DL3006,DL3029
 FROM          --platform=$BUILDPLATFORM $BUILDER_BASE                                                                   AS builder-healthcheck
 
 ARG           GIT_REPO=github.com/dubo-dubon-duponey/healthcheckers
@@ -13,8 +13,8 @@ ARG           GIT_VERSION=51ebf8ca3d255e0c846307bf72740f731e6210c3
 WORKDIR       $GOPATH/src/$GIT_REPO
 RUN           git clone git://$GIT_REPO .
 RUN           git checkout $GIT_VERSION
-RUN           arch="${TARGETPLATFORM#*/}"; \
-              env GOOS=linux GOARCH="${arch%/*}" go build -v -ldflags "-s -w" \
+# hadolint ignore=DL4006
+RUN           env GOOS=linux GOARCH="$(printf "%s" "$TARGETPLATFORM" | sed -E 's/^[^/]+\/([^/]+).*/\1/')" go build -v -ldflags "-s -w" \
                 -o /dist/boot/bin/http-health ./cmd/http
 
 #######################
@@ -27,8 +27,12 @@ FROM          $BUILDER_BASE                                                     
 #ENV           KBN_AMD64_SHA512=7c99c54bd8d34b707e788702e5a1a570e9504822af77d7b7d0ab3e80048be673c342953551508afc93c2b58aa78ec3cc68939b893601a94bd4ccaa206c9804bb
 #ENV           KBN_VERSION=7.5.2
 #ENV           KBN_AMD64_SHA512=7717eabe15a2ccd50cdc2acce592fc60af303516af2337145ab59be901d781e6545503a969ff7147e71e7189404ecbc870898daa92292e42002390f65e7cae41
-ENV           KBN_VERSION=7.7.1
-ENV           KBN_AMD64_SHA512=d3bc9257e04cfe1691756b29793ba7fb1affa742e70689045c0d023edf5db7968e3bdb874976c78ae19446cd2de12179adead059c7fc8b134405e3de0305b8f5
+#ENV           KBN_VERSION=7.7.1
+#ENV           KBN_AMD64_SHA512=d3bc9257e04cfe1691756b29793ba7fb1affa742e70689045c0d023edf5db7968e3bdb874976c78ae19446cd2de12179adead059c7fc8b134405e3de0305b8f5
+#ENV           KBN_VERSION=7.8.1
+#ENV           KBN_AMD64_SHA512=92f3717b2f9ea915570ee8587f1ad0c2a428c266e1cd7dcda485b8b81191c5c1b3155872299c56dbba8de93807b2cc67a0d197ecb2e8df44e09060d4fac1d759
+ENV           KBN_VERSION=7.10.0
+ENV           KBN_AMD64_SHA512=385fe5d875ba074e0931a1e9ebbac8e3d91d300ca478f589da06b01c68e4694c5953a538afd6c385bdccec0f0d3cda1a5dc39f1b56e41d584cdcab8fba466677
 
 RUN           apt-get update -qq \
               && apt-get install -qq --no-install-recommends \
