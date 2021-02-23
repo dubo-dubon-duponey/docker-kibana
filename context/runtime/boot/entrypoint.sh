@@ -1,55 +1,160 @@
 #!/usr/bin/env bash
 set -o errexit -o errtrace -o functrace -o nounset -o pipefail
 
-export LOGGING_DEST=/dev/stdout
-export PID_FILE=/data/kibana.pid
-export PATH_DATA=/data/data
+[ -w "/certs" ] || {
+  >&2 printf "/certs is not writable. Check your mount permissions.\n"
+  exit 1
+}
+
+[ -w "/tmp" ] || {
+  >&2 printf "/tmp is not writable. Check your mount permissions.\n"
+  exit 1
+}
+
+# Helpers
+case "${1:-}" in
+  # Short hand helper to generate password hash
+  "hash")
+    shift
+    >&2 echo "Going to generate a password hash with salt: $SALT"
+    caddy hash-password -algorithm bcrypt -salt "$SALT" "$@"
+    exit
+  ;;
+  # Helper to get the ca.crt out (once initialized)
+  "cert")
+    if [ "$TLS" != internal ]; then
+      echo "Your server is not configured in self-signing mode. This command is a no-op in that case."
+      exit 1
+    fi
+    if [ ! -e "/certs/pki/authorities/local/root.crt" ]; then
+      echo "No root certificate installed or generated. Run the container so that a cert is generated, or provide one at runtime."
+      exit 1
+    fi
+    cat /certs/pki/authorities/local/root.crt
+    exit
+  ;;
+esac
+
+# Given how the caddy conf is set right now, we cannot have these be not set, so, stuff in randomized shit in there
+readonly SALT="${SALT:-"$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 64 | base64)"}"
+readonly USERNAME="${USERNAME:-"$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 64)"}"
+readonly PASSWORD="${PASSWORD:-$(caddy hash-password -algorithm bcrypt -salt "$SALT" -plaintext "$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 64)")}"
+
+# Bonjour the container if asked to
+if [ "${MDNS_ENABLED:-}" == true ]; then
+  goello-server -name "$MDNS_NAME" -host "$MDNS_HOST" -port "$PORT" -type "$MDNS_TYPE" &
+fi
+
+
+
+
+# export LOGGING_DEST=/dev/stdout
+export PID_FILE=/tmp/kibana.pid
+export PATH_DATA=/data/kibana
+# Map these to the domain used by caddy
+# XXX this is not working, because of mDNS (or generally, resolution) - since kibana will likely feed that into the host header
+# maybe this can be rewritten on the fly at the Caddy level?
+#export SERVER_NAME="$DOMAIN"
+#export SERVER_HOST="$DOMAIN"
 
 kibana_vars=(
     console.enabled
     console.proxyConfig
     console.proxyFilter
+    ops.cGroupOverrides.cpuPath
+    ops.cGroupOverrides.cpuAcctPath
+    cpu.cgroup.path.override
+    cpuacct.cgroup.path.override
+    csp.rules
+    csp.strict
+    csp.warnLegacyBrowsers
     elasticsearch.customHeaders
     elasticsearch.hosts
     elasticsearch.logQueries
     elasticsearch.password
     elasticsearch.pingTimeout
-    elasticsearch.preserveHost
     elasticsearch.requestHeadersWhitelist
     elasticsearch.requestTimeout
     elasticsearch.shardTimeout
     elasticsearch.sniffInterval
     elasticsearch.sniffOnConnectionFault
     elasticsearch.sniffOnStart
+    elasticsearch.ssl.alwaysPresentCertificate
     elasticsearch.ssl.certificate
     elasticsearch.ssl.certificateAuthorities
     elasticsearch.ssl.key
     elasticsearch.ssl.keyPassphrase
+    elasticsearch.ssl.keystore.path
+    elasticsearch.ssl.keystore.password
+    elasticsearch.ssl.truststore.path
+    elasticsearch.ssl.truststore.password
     elasticsearch.ssl.verificationMode
-    elasticsearch.startupTimeout
     elasticsearch.username
+    enterpriseSearch.accessCheckTimeout
+    enterpriseSearch.accessCheckTimeoutWarning
+    enterpriseSearch.enabled
+    enterpriseSearch.host
     i18n.locale
+    interpreter.enableInVisualize
+    kibana.autocompleteTerminateAfter
+    kibana.autocompleteTimeout
     kibana.defaultAppId
     kibana.index
     logging.dest
+    logging.json
     logging.quiet
+    logging.rotate.enabled
+    logging.rotate.everyBytes
+    logging.rotate.keepFiles
+    logging.rotate.pollingInterval
+    logging.rotate.usePolling
     logging.silent
     logging.useUTC
     logging.verbose
     map.includeElasticMapsService
+    map.proxyElasticMapsServiceInMaps
+    map.regionmap
+    map.tilemap.options.attribution
+    map.tilemap.options.maxZoom
+    map.tilemap.options.minZoom
+    map.tilemap.options.subdomains
+    map.tilemap.url
+    monitoring.cluster_alerts.email_notifications.email_address
+    monitoring.enabled
+    monitoring.kibana.collection.enabled
+    monitoring.kibana.collection.interval
+    monitoring.ui.container.elasticsearch.enabled
+    monitoring.ui.container.logstash.enabled
+    monitoring.ui.elasticsearch.password
+    monitoring.ui.elasticsearch.pingTimeout
+    monitoring.ui.elasticsearch.hosts
+    monitoring.ui.elasticsearch.username
+    monitoring.ui.elasticsearch.logFetchCount
+    monitoring.ui.elasticsearch.ssl.certificateAuthorities
+    monitoring.ui.elasticsearch.ssl.verificationMode
+    monitoring.ui.enabled
+    monitoring.ui.max_bucket_size
+    monitoring.ui.min_interval_seconds
+    newsfeed.enabled
     ops.interval
     path.data
     pid.file
     regionmap
-    regionmap.includeElasticMapsService
+    security.showInsecureClusterWarning
     server.basePath
     server.customResponseHeaders
+    server.compression.enabled
+    server.compression.referrerWhitelist
+    server.cors
+    server.cors.origin
     server.defaultRoute
     server.host
+    server.keepAliveTimeout
     server.maxPayloadBytes
     server.name
     server.port
     server.rewriteBasePath
+    server.socketTimeout
     server.ssl.cert
     server.ssl.certificate
     server.ssl.certificateAuthorities
@@ -59,8 +164,13 @@ kibana_vars=(
     server.ssl.enabled
     server.ssl.key
     server.ssl.keyPassphrase
+    server.ssl.keystore.path
+    server.ssl.keystore.password
+    server.ssl.truststore.path
+    server.ssl.truststore.password
     server.ssl.redirectHttpFromPort
     server.ssl.supportedProtocols
+    server.xsrf.disableProtection
     server.xsrf.whitelist
     status.allowAnonymous
     status.v6ApiFormat
@@ -71,18 +181,40 @@ kibana_vars=(
     tilemap.url
     timelion.enabled
     vega.enableExternalUrls
+    xpack.actions.proxyUrl
     xpack.apm.enabled
+    xpack.apm.serviceMapEnabled
     xpack.apm.ui.enabled
     xpack.apm.ui.maxTraceItems
+    xpack.apm.ui.transactionGroupBucketSize
     apm_oss.apmAgentConfigurationIndex
     apm_oss.indexPattern
     apm_oss.errorIndices
     apm_oss.onboardingIndices
     apm_oss.spanIndices
+    apm_oss.sourcemapIndices
     apm_oss.transactionIndices
     apm_oss.metricsIndices
     xpack.canvas.enabled
+    xpack.code.ui.enabled
+    xpack.code.disk.thresholdEnabled
+    xpack.code.disk.watermarkLow
+    xpack.code.maxWorkspace
+    xpack.code.indexRepoFrequencyMs
+    xpack.code.updateRepoFrequencyMs
+    xpack.code.lsp.verbose
+    xpack.code.verbose
+    xpack.code.security.enableGitCertCheck
+    xpack.code.security.gitHostWhitelist
+    xpack.code.security.gitProtocolWhitelist
+    xpack.encryptedSavedObjects.encryptionKey
+    xpack.encryptedSavedObjects.keyRotation.decryptionOnlyKeys
+    xpack.fleet.agents.elasticsearch.host
+    xpack.fleet.agents.kibana.host
+    xpack.fleet.agents.tlsCheckDisabled
     xpack.graph.enabled
+    xpack.graph.canEditDrillDownUrls
+    xpack.graph.savePolicy
     xpack.grokdebugger.enabled
     xpack.infra.enabled
     xpack.infra.query.partitionFactor
@@ -95,25 +227,16 @@ kibana_vars=(
     xpack.infra.sources.default.fields.timestamp
     xpack.infra.sources.default.logAlias
     xpack.infra.sources.default.metricAlias
+    xpack.ingestManager.fleet.tlsCheckDisabled
+    xpack.ingestManager.registryUrl
+    xpack.license_management.enabled
+    xpack.maps.enabled
+    xpack.maps.showMapVisualizationTypes
     xpack.ml.enabled
-    xpack.monitoring.elasticsearch.password
-    xpack.monitoring.elasticsearch.pingTimeout
-    xpack.monitoring.elasticsearch.hosts
-    xpack.monitoring.elasticsearch.username
-    xpack.monitoring.elasticsearch.ssl.certificateAuthorities
-    xpack.monitoring.elasticsearch.ssl.verificationMode
-    xpack.monitoring.enabled
-    xpack.monitoring.kibana.collection.enabled
-    xpack.monitoring.kibana.collection.interval
-    xpack.monitoring.max_bucket_size
-    xpack.monitoring.min_interval_seconds
-    xpack.monitoring.node_resolver
-    xpack.monitoring.report_stats
-    xpack.monitoring.elasticsearch.pingTimeout
-    xpack.monitoring.ui.container.elasticsearch.enabled
-    xpack.monitoring.ui.container.logstash.enabled
-    xpack.monitoring.ui.enabled
+    xpack.reporting.capture.browser.autoDownload
     xpack.reporting.capture.browser.chromium.disableSandbox
+    xpack.reporting.capture.browser.chromium.inspect
+    xpack.reporting.capture.browser.chromium.maxScreenshotDimension
     xpack.reporting.capture.browser.chromium.proxy.enabled
     xpack.reporting.capture.browser.chromium.proxy.server
     xpack.reporting.capture.browser.chromium.proxy.bypass
@@ -122,7 +245,20 @@ kibana_vars=(
     xpack.reporting.capture.loadDelay
     xpack.reporting.capture.settleTime
     xpack.reporting.capture.timeout
+    xpack.reporting.capture.viewport.height
+    xpack.reporting.capture.viewport.width
+    xpack.reporting.capture.zoom
+    xpack.reporting.csv.checkForFormulas
+    xpack.reporting.csv.escapeFormulaValues
+    xpack.reporting.csv.enablePanelActionDownload
+    xpack.reporting.csv.useByteOrderMarkEncoding
     xpack.reporting.csv.maxSizeBytes
+    xpack.reporting.csv.scroll.duration
+    xpack.reporting.csv.scroll.size
+    xpack.reporting.capture.maxAttempts
+    xpack.reporting.capture.timeouts.openUrl
+    xpack.reporting.capture.timeouts.waitForElements
+    xpack.reporting.capture.timeouts.renderComplete
     xpack.reporting.enabled
     xpack.reporting.encryptionKey
     xpack.reporting.index
@@ -130,24 +266,47 @@ kibana_vars=(
     xpack.reporting.kibanaServer.hostname
     xpack.reporting.kibanaServer.port
     xpack.reporting.kibanaServer.protocol
+    xpack.reporting.poll.jobCompletionNotifier.interval
+    xpack.reporting.poll.jobCompletionNotifier.intervalErrorMultiplier
+    xpack.reporting.poll.jobsRefresh.interval
+    xpack.reporting.poll.jobsRefresh.intervalErrorMultiplier
     xpack.reporting.queue.indexInterval
+    xpack.reporting.queue.pollEnabled
     xpack.reporting.queue.pollInterval
+    xpack.reporting.queue.pollIntervalErrorMultiplier
     xpack.reporting.queue.timeout
     xpack.reporting.roles.allow
+    xpack.rollup.enabled
+    xpack.security.audit.enabled
     xpack.searchprofiler.enabled
     xpack.security.authProviders
     xpack.security.authc.providers
     xpack.security.authc.oidc.realm
     xpack.security.authc.saml.realm
+    xpack.security.authc.saml.maxRedirectURLSize
+    xpack.security.authc.selector.enabled
     xpack.security.cookieName
     xpack.security.enabled
     xpack.security.encryptionKey
+    xpack.security.loginAssistanceMessage
+    xpack.security.sameSiteCookies
     xpack.security.secureCookies
     xpack.security.sessionTimeout
+    xpack.security.session.idleTimeout
+    xpack.security.session.lifespan
+    xpack.security.session.cleanupInterval
+    xpack.security.loginAssistanceMessage
+    xpack.security.loginHelp
     xpack.security.public.protocol
     xpack.security.public.hostname
     xpack.security.public.port
-    xpack.telemetry.enabled
+    xpack.spaces.enabled
+    xpack.spaces.maxSpaces
+    telemetry.allowChangingOptInStatus
+    telemetry.enabled
+    telemetry.optIn
+    telemetry.optInStatusUrl
+    telemetry.sendUsageFrom
 )
 
 longopts=''
@@ -167,17 +326,13 @@ done
 # Files created at run-time should be group-writable, for Openshift's sake.
 umask 0002
 
-# The virtual file /proc/self/cgroup should list the current cgroup
-# membership. For each hierarchy, you can follow the cgroup path from
-# this file to the cgroup filesystem (usually /sys/fs/cgroup/) and
-# introspect the statistics for the cgroup for the given
-# hierarchy. Alas, Docker breaks this by mounting the container
-# statistics at the root while leaving the cgroup paths as the actual
-# paths. Therefore, Kibana provides a mechanism to override
-# reading the cgroup path from /proc/self/cgroup and instead uses the
-# cgroup path defined the configuration properties
-# cpu.cgroup.path.override and cpuacct.cgroup.path.override.
-# Therefore, we set this value here so that cgroup statistics are
-# available for the container this process will run in.
 
-exec kibana --cpu.cgroup.path.override=/ --cpuacct.cgroup.path.override=/ ${longopts} "$@"
+#kibana --allow-root --cpu.cgroup.path.override=/ --cpuacct.cgroup.path.override=/ ${longopts} "$@" &
+# DOMAIN= kibana --allow-root --ops.cGroupOverrides.cpuPath=/ --ops.cGroupOverrides.cpuAcctPath=/ ${longopts} "$@" &
+
+rm -f "/tmp/kibana.pid"
+
+kibana --allow-root ${longopts} "$@" &
+
+# Trick caddy into using the proper location for shit... still, /tmp keeps on being used (possibly by the pki lib?)
+HOME=/data/caddy-home exec caddy run -config /config/caddy/main.conf --adapter caddyfile "$@"

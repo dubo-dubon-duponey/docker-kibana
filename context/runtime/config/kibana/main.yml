@@ -1,0 +1,40 @@
+# Default Kibana configuration for docker target
+server.name: kibana
+server.host: "0"
+# elasticsearch.hosts: [ "http://elasticsearch:9200" ]
+monitoring:
+  ui:
+    container:
+      elasticsearch:
+        enabled: true
+
+logging:
+  dest: "/dev/stdout"
+
+pid:
+  file: "/tmp/kibana.pid"
+
+# The virtual file /proc/self/cgroup should list the current cgroup
+# membership. For each hierarchy, you can follow the cgroup path from
+# this file to the cgroup filesystem (usually /sys/fs/cgroup/) and
+# introspect the statistics for the cgroup for the given
+# hierarchy. Alas, Docker breaks this by mounting the container
+# statistics at the root while leaving the cgroup paths as the actual
+# paths. Therefore, Kibana provides a mechanism to override
+# reading the cgroup path from /proc/self/cgroup and instead uses the
+# cgroup path defined the configuration properties
+# cpu.cgroup.path.override and cpuacct.cgroup.path.override.
+# Therefore, we set this value here so that cgroup statistics are
+# available for the container this process will run in.
+ops:
+  cGroupOverrides:
+    cpuPath: "/"
+    cpuAcctPath: "/"
+
+# Sandboxing using user namespaces is meaningless in the context of a container
+xpack:
+  reporting:
+    capture:
+      browser:
+        chromium:
+          disableSandbox: true
