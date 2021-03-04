@@ -34,9 +34,6 @@ For Kibana specifically:
 
 ```bash
 
-# The salt that is going to be used for storing passwords
-SALT=lalalalala
-
 # Domain name for your Elastic server (will be used to generate self-signed certificates, and also as a container name)
 ES_DOMAIN=myelastic.local
 # Same, for kibana
@@ -51,15 +48,13 @@ USERNAME=my_elastic_username
 PASSWORD=secret_password
 
 ######################################
-# Salt encoding and password salting
+# Password salting
 ######################################
 
 # Generate the salted password hash
-SALTED_PASSWORD="$(docker run --rm --env SALT="$SALT" dubodubonduponey/elastic hash -plaintext "$PASSWORD" 2>/dev/null)"
+SALTED_PASSWORD="$(docker run --rm dubodubonduponey/elastic hash -plaintext "$PASSWORD" 2>/dev/null)"
 # If you prefer *not* to pass the plaintext password, you can provide it interactively and manually copy the output into SALTED_PASSWORD
-# docker run -ti --env SALT="$ES_SALT" dubodubonduponey/elastic hash-interactive
-
-B64_SALT="$(printf "%s" "$SALT" | base64)"
+# docker run -ti dubodubonduponey/elastic hash-interactive
 
 mkdir -p certificates
 
@@ -78,7 +73,6 @@ docker run -d \
   --name "$KBN_DOMAIN" \
   --publish "$KBN_PORT:$KBN_PORT" \
   --env DOMAIN="$KBN_DOMAIN" \
-  --env SALT="$B64_SALT" \
   --env PORT="$KBN_PORT" \
   --env USERNAME="$USERNAME" \
   --env PASSWORD="$SALTED_PASSWORD" \

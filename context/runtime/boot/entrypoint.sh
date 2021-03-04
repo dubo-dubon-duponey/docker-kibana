@@ -2,28 +2,37 @@
 set -o errexit -o errtrace -o functrace -o nounset -o pipefail
 
 [ -w "/certs" ] || {
-  >&2 printf "/certs is not writable. Check your mount permissions.\n"
+  printf >&2 "/certs is not writable. Check your mount permissions.\n"
   exit 1
 }
 
 [ -w "/tmp" ] || {
-  >&2 printf "/tmp is not writable. Check your mount permissions.\n"
+  printf >&2 "/tmp is not writable. Check your mount permissions.\n"
+  exit 1
+}
+
+[ -w "/data" ] || {
+  printf >&2 "/data is not writable. Check your mount permissions.\n"
   exit 1
 }
 
 # Helpers
-case "${1:-}" in
+case "${1:-run}" in
   # Short hand helper to generate password hash
   "hash")
     shift
-    >&2 echo "Going to generate a password hash with salt: $SALT"
-    caddy hash-password -algorithm bcrypt -salt "$SALT" "$@"
+    printf >&2 "Generating password hash\n"
+    caddy hash-password -algorithm bcrypt "$@"
     exit
   ;;
   # Helper to get the ca.crt out (once initialized)
   "cert")
+    if [ "$TLS" == "" ]; then
+      echo "Your container is not configured for TLS termination - there is no local CA in that case."
+      exit 1
+    fi
     if [ "$TLS" != internal ]; then
-      echo "Your server is not configured in self-signing mode. This command is a no-op in that case."
+      echo "Your container uses letsencrypt - there is no local CA in that case."
       exit 1
     fi
     if [ ! -e "/certs/pki/authorities/local/root.crt" ]; then
@@ -33,29 +42,27 @@ case "${1:-}" in
     cat /certs/pki/authorities/local/root.crt
     exit
   ;;
+  "run")
+    # Bonjour the container if asked to. While the PORT is no guaranteed to be mapped on the host in bridge, this does not matter since mDNS will not work at all in bridge mode.
+    if [ "${MDNS_ENABLED:-}" == true ]; then
+      goello-server -name "$MDNS_NAME" -host "$MDNS_HOST" -port "$PORT" -type "$MDNS_TYPE" &
+    fi
+
+    # If we want TLS and authentication, start caddy in the background
+    if [ "$TLS" ]; then
+      HOME=/tmp/caddy-home exec caddy run -config /config/caddy/main.conf --adapter caddyfile &
+    fi
+  ;;
 esac
 
-# Given how the caddy conf is set right now, we cannot have these be not set, so, stuff in randomized shit in there
-readonly SALT="${SALT:-"$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 64 | base64)"}"
-readonly USERNAME="${USERNAME:-"$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 64)"}"
-readonly PASSWORD="${PASSWORD:-$(caddy hash-password -algorithm bcrypt -salt "$SALT" -plaintext "$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 64)")}"
-
-# Bonjour the container if asked to
-if [ "${MDNS_ENABLED:-}" == true ]; then
-  goello-server -name "$MDNS_NAME" -host "$MDNS_HOST" -port "$PORT" -type "$MDNS_TYPE" &
-fi
-
-
-
+# This is in the official dockerfile, so...
+export ELASTIC_CONTAINER=true
 
 # export LOGGING_DEST=/dev/stdout
-export PID_FILE=/tmp/kibana.pid
+# export PID_FILE=/tmp/kibana.pid
 export PATH_DATA=/data/kibana
-# Map these to the domain used by caddy
-# XXX this is not working, because of mDNS (or generally, resolution) - since kibana will likely feed that into the host header
-# maybe this can be rewritten on the fly at the Caddy level?
-#export SERVER_NAME="$DOMAIN"
-#export SERVER_HOST="$DOMAIN"
+
+rm -f /tmp/kibana.pid
 
 kibana_vars=(
     console.enabled
@@ -323,16 +330,6 @@ for kibana_var in ${kibana_vars[*]}; do
     fi
 done
 
-# Files created at run-time should be group-writable, for Openshift's sake.
-umask 0002
-
-
-#kibana --allow-root --cpu.cgroup.path.override=/ --cpuacct.cgroup.path.override=/ ${longopts} "$@" &
-# DOMAIN= kibana --allow-root --ops.cGroupOverrides.cpuPath=/ --ops.cGroupOverrides.cpuAcctPath=/ ${longopts} "$@" &
-
-rm -f "/tmp/kibana.pid"
-
-kibana --allow-root ${longopts} "$@" &
-
-# Trick caddy into using the proper location for shit... still, /tmp keeps on being used (possibly by the pki lib?)
-HOME=/data/caddy-home exec caddy run -config /config/caddy/main.conf --adapter caddyfile "$@"
+# Allow root so we can bind to 443 in the container IF ASKED TO
+# Note that this does not work for elastic and there is no apparent way to work around it
+kibana --allow-root ${longopts} "$@"

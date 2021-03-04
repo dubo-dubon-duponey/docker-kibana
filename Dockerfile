@@ -66,9 +66,9 @@ RUN           env GOOS=linux GOARCH="$(printf "%s" "$TARGETPLATFORM" | sed -E 's
 FROM          --platform=$BUILDPLATFORM $BUILDER_BASE                                                                   AS builder-main
 
 # Note that this is tied to x86_64 and not a proper multi-arch image
-ARG           KBN_VERSION=7.11.1
-ARG           KBN_AMD64_SHA512=5facaac7adced5ac2830158d6a7994d9c32e042c320f250626166a9e86cce3fa4c3e8b92809526492b4d09b0b8623ea2c3bfd02751a8f1387bc3f09a1bee642b
-ARG           KBN_AARCH64_SHA512=af451e0aab7f3934c733240cd5f84513b54188357de81de9b03f085a84dfc18694af547c5c943632feb13dfce211b2f03bba488b6f475338cc6e15c7cd422c59
+ARG           VERSION=7.11.1
+ARG           AMD64_SHA512=5facaac7adced5ac2830158d6a7994d9c32e042c320f250626166a9e86cce3fa4c3e8b92809526492b4d09b0b8623ea2c3bfd02751a8f1387bc3f09a1bee642b
+ARG           AARCH64_SHA512=af451e0aab7f3934c733240cd5f84513b54188357de81de9b03f085a84dfc18694af547c5c943632feb13dfce211b2f03bba488b6f475338cc6e15c7cd422c59
 
 RUN           apt-get update -qq \
               && apt-get install -qq --no-install-recommends \
@@ -79,19 +79,16 @@ WORKDIR       /dist/boot
 # hadolint ignore=DL4006
 RUN           set -eu; \
               case "$TARGETPLATFORM" in \
-                "linux/amd64")    arch=x86_64;      checksum=$KBN_AMD64_SHA512;      ;; \
-                "linux/arm64")    arch=aarch64;     checksum=$KBN_AARCH64_SHA512;     ;; \
+                "linux/amd64")    arch=x86_64;      checksum=$AMD64_SHA512;      ;; \
+                "linux/arm64")    arch=aarch64;     checksum=$AARCH64_SHA512;     ;; \
               esac; \
-              curl --proto '=https' --tlsv1.2 -sSfL -o archive.tgz https://artifacts.elastic.co/downloads/kibana/kibana-"${KBN_VERSION}"-linux-"$arch".tar.gz; \
+              curl --proto '=https' --tlsv1.2 -sSfL -o archive.tgz https://artifacts.elastic.co/downloads/kibana/kibana-"${VERSION}"-linux-"$arch".tar.gz; \
               printf "Downloaded shasum: %s\n" "$(sha512sum archive.tgz)"; \
               printf "%s *archive.tgz" "$checksum" | sha512sum -c -; \
               tar --strip-components=1 -zxf archive.tgz; \
               rm archive.tgz; \
               rm config/kibana.yml; \
               ln -s /config/kibana/main.yml config/kibana.yml
-              # For now, revert to the provided node...
-              # rm node/bin/node; \
-              # ln -s /usr/bin/node node/bin/node;
 
 #######################
 # Builder assembly
@@ -102,7 +99,7 @@ FROM          $BUILDER_BASE                                                     
 COPY          --from=builder-healthcheck /dist/boot/bin /dist/boot/bin
 COPY          --from=builder-goello /dist/boot/bin /dist/boot/bin
 COPY          --from=builder-caddy /dist/boot/bin /dist/boot/bin
-COPY          --from=builder-main /dist/boot/bin /dist/boot/bin
+COPY          --from=builder-main /dist/boot /dist/boot
 
 RUN           chmod 555 /dist/boot/bin/*; \
               epoch="$(date --date "$BUILD_CREATED" +%s)"; \
@@ -130,40 +127,23 @@ RUN           apt-get update -qq          && \
 
 USER          dubo-dubon-duponey
 
-#ENV           NODE_VERSION=14.15.4
-#ENV           YARN_VERSION=1.22.5
-
-#RUN           curl --proto '=https' --tlsv1.2 -sSfL -o node.tar.gz "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.gz"
-
-#ADD           ./cache/$TARGETPLATFORM/node-$NODE_VERSION.tar.gz /opt
-#ADD           ./cache/$TARGETPLATFORM/yarn-$YARN_VERSION.tar.gz /opt
-
-#RUN           set -eu; \
-#              ln -s /opt/node-*/bin/* /usr/local/bin/; \
-#              ln -s /usr/local/bin/node /usr/local/bin/nodejs
-
-#              ln -s /opt/yarn-*/bin/yarn /usr/local/bin/; \
-#              ln -s /opt/yarn-*/bin/yarnpkg /usr/local/bin/; \
-
 # Bring in Kibana from the initial stage.
 COPY          --from=builder --chown=$BUILD_UID:root /dist .
-COPY          --from=builder-main /dist/boot /boot
 
 ### Front server configuration
 # Port to use
 ENV           PORT=4443
 EXPOSE        4443
-# Log verbosity for
-ENV           LOG_LEVEL=info
+# Log verbosity
+ENV           LOG_LEVEL=warn
 # Domain name to serve
 ENV           DOMAIN="kibana.local"
 # Control wether tls is going to be "internal" (eg: self-signed), or alternatively an email address to enable letsencrypt
 ENV           TLS="internal"
 
-# Salt and realm in case anything is authenticated
-ENV           SALT="eW91IGFyZSBzbyBzbWFydAo="
-ENV           REALM="My precious"
-# if authenticated, pass along a username and bcrypted password (call the container with the "hash" command to generate one)
+# Realm in case access is authenticated
+ENV           REALM="My Precious Realm"
+# Provide username and password here (call the container with the "hash" command to generate a properly encrypted password, otherwise, a random one will be generated)
 ENV           USERNAME=""
 ENV           PASSWORD=""
 
@@ -171,10 +151,10 @@ ENV           PASSWORD=""
 # Enable/disable mDNS support
 ENV           MDNS_ENABLED=false
 # Name is used as a short description for the service
-ENV           MDNS_NAME="Fancy Service Name"
+ENV           MDNS_NAME="My Precious mDNS Service"
 # The service will be annonced and reachable at $MDNS_HOST.local
 ENV           MDNS_HOST=kibana
-# Type being advertised
+# Type to advertise
 ENV           MDNS_TYPE=_http._tcp
 
 # Caddy certs will be stored here
@@ -183,21 +163,14 @@ VOLUME        /certs
 # Caddy uses this
 VOLUME        /tmp
 
-# Kibana configuration defaults
-ENV           ELASTIC_CONTAINER=true
-
-ENV           ELASTICSEARCH_HOSTS="http://elasticsearch:9200"
-
-# Default volumes for data
+# Elastic data will be stored here
 VOLUME        /data
 
-# From 7.5, it seems now this is needed for /tmp/chromium-XXXXXX
-VOLUME        /tmp
-# XXX eff you kbn
-VOLUME        /boot/optimize
+ENV           ELASTICSEARCH_HOSTS="https://elastic.local:4443"
 
 # xpack.monitoring.ui.container.elasticsearch.enabled: true
-# XXX this won't work as kibana apparently no longer binds on localhost
-ENV           HEALTHCHECK_URL="http://127.0.0.1:10042/api/status?healthcheck"
+# This var also enables the corresponding caddy app
+ENV           HEALTHCHECK_URL="http://127.0.0.1:10000/api/status?healthcheck"
+
 # TODO make interval configurable
-HEALTHCHECK   --interval=30s --timeout=30s --start-period=10s --retries=1 CMD http-health || exit 1
+HEALTHCHECK   --interval=120s --timeout=30s --start-period=10s --retries=1 CMD http-health || exit 1

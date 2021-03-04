@@ -1,7 +1,11 @@
 # Default Kibana configuration for docker target
-server.name: kibana
-server.host: "0"
+server:
+  name: kibana
+  host: "0"
+  port: 42042
+
 # elasticsearch.hosts: [ "http://elasticsearch:9200" ]
+
 monitoring:
   ui:
     container:
