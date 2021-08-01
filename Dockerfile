@@ -5,6 +5,7 @@ ARG           FROM_IMAGE_RUNTIME=base:runtime-bullseye-2021-07-01@sha256:9f5b20d
 ARG           FROM_IMAGE_TOOLS=tools:linux-bullseye-2021-07-01@sha256:f1e25694fe933c7970773cb323975bb5c995fa91d0c1a148f4f1c131cbc5872c
 ARG           FROM_IMAGE_NODE=base:node-bullseye-2021-07-01@sha256:d201555186aa4982ba6aa48fb283d2ce5e74e50379a7b9e960c22a10ee23ba54
 
+FROM          $FROM_REGISTRY/$FROM_IMAGE_TOOLS                                                                          AS builder-tools
 FROM          $FROM_REGISTRY/$FROM_IMAGE_NODE                                                                           AS node
 
 FROM          --platform=$BUILDPLATFORM $FROM_REGISTRY/$FROM_IMAGE_BUILDER                                              AS fetcher-main
