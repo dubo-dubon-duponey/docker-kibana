@@ -1,88 +1,44 @@
-ARG           BUILDER_BASE=dubodubonduponey/base@sha256:b51f084380bc1bd2b665840317b6f19ccc844ee2fc7e700bf8633d95deba2819
-ARG           RUNTIME_BASE=dubodubonduponey/base@sha256:d28e8eed3e87e8dc5afdd56367d3cf2da12a0003d064b5c62405afbe4725ee99
+ARG           FROM_REGISTRY=ghcr.io/dubo-dubon-duponey
 
-#######################
-# Extra builder for healthchecker
-#######################
-# hadolint ignore=DL3006,DL3029
-FROM          --platform=$BUILDPLATFORM $BUILDER_BASE                                                                   AS builder-healthcheck
+ARG           FROM_IMAGE_BUILDER=base:builder-bullseye-2021-07-01@sha256:f1c46316c38cc1ca54fd53b54b73797b35ba65ee727beea1a5ed08d0ad7e8ccf
+ARG           FROM_IMAGE_RUNTIME=base:runtime-bullseye-2021-07-01@sha256:9f5b20d392e1a1082799b3befddca68cee2636c72c502aa7652d160896f85b36
+ARG           FROM_IMAGE_TOOLS=tools:linux-bullseye-2021-07-01@sha256:f1e25694fe933c7970773cb323975bb5c995fa91d0c1a148f4f1c131cbc5872c
+ARG           FROM_IMAGE_NODE=base:node-bullseye-2021-07-01@sha256:d201555186aa4982ba6aa48fb283d2ce5e74e50379a7b9e960c22a10ee23ba54
 
-ARG           GIT_REPO=github.com/dubo-dubon-duponey/healthcheckers
-ARG           GIT_VERSION=51ebf8ca3d255e0c846307bf72740f731e6210c3
-ARG           BUILD_TARGET=./cmd/http
-ARG           BUILD_OUTPUT=http-health
-ARG           BUILD_FLAGS="-s -w"
+FROM          $FROM_REGISTRY/$FROM_IMAGE_NODE                                                                           AS node
 
-WORKDIR       $GOPATH/src/$GIT_REPO
-RUN           git clone git://$GIT_REPO .
-RUN           git checkout $GIT_VERSION
-# hadolint ignore=DL4006
-RUN           env GOOS=linux GOARCH="$(printf "%s" "$TARGETPLATFORM" | sed -E 's/^[^/]+\/([^/]+).*/\1/')" go build -v \
-                -ldflags "$BUILD_FLAGS" -o /dist/boot/bin/"$BUILD_OUTPUT" "$BUILD_TARGET"
+FROM          --platform=$BUILDPLATFORM $FROM_REGISTRY/$FROM_IMAGE_BUILDER                                              AS fetcher-main
 
-#######################
-# Goello
-#######################
-# hadolint ignore=DL3006,DL3029
-FROM          --platform=$BUILDPLATFORM $BUILDER_BASE                                                                   AS builder-goello
+ENV           GIT_REPO=github.com/elastic/kibana
+ENV           GIT_VERSION=v7.13.4
+ENV           GIT_COMMIT=024b8904d1508252df7cb41ac98f48c48f7bcb33
 
-ARG           GIT_REPO=github.com/dubo-dubon-duponey/goello
-ARG           GIT_VERSION=3799b6035dd5c4d5d1c061259241a9bedda810d6
-ARG           BUILD_TARGET=./cmd/server
-ARG           BUILD_OUTPUT=goello-server
-ARG           BUILD_FLAGS="-s -w"
-
-WORKDIR       $GOPATH/src/$GIT_REPO
-RUN           git clone git://$GIT_REPO .
-RUN           git checkout $GIT_VERSION
-# hadolint ignore=DL4006
-RUN           env GOOS=linux GOARCH="$(printf "%s" "$TARGETPLATFORM" | sed -E 's/^[^/]+\/([^/]+).*/\1/')" go build -v \
-                -ldflags "$BUILD_FLAGS" -o /dist/boot/bin/"$BUILD_OUTPUT" "$BUILD_TARGET"
-
-#######################
-# Caddy
-#######################
-# hadolint ignore=DL3006,DL3029
-FROM          --platform=$BUILDPLATFORM $BUILDER_BASE                                                                   AS builder-caddy
-
-# This is 2.3.0
-ARG           GIT_REPO=github.com/caddyserver/caddy
-ARG           GIT_VERSION=1b453dd4fbea2f3a54362fb4c2115bab85cad1b7
-ARG           BUILD_TARGET=./cmd/caddy
-ARG           BUILD_OUTPUT=caddy
-ARG           BUILD_FLAGS="-s -w"
-
-WORKDIR       $GOPATH/src/$GIT_REPO
-RUN           git clone https://$GIT_REPO .
-RUN           git checkout $GIT_VERSION
-# hadolint ignore=DL4006
-RUN           env GOOS=linux GOARCH="$(printf "%s" "$TARGETPLATFORM" | sed -E 's/^[^/]+\/([^/]+).*/\1/')" go build -v \
-                -ldflags "$BUILD_FLAGS" -o /dist/boot/bin/"$BUILD_OUTPUT" "$BUILD_TARGET"
+RUN           git clone --recurse-submodules git://"$GIT_REPO" .
+RUN           git checkout "$GIT_COMMIT"
 
 #######################
 # Main builder
 #######################
-# hadolint ignore=DL3006,DL3029
-FROM          --platform=$BUILDPLATFORM $BUILDER_BASE                                                                   AS builder-main
+FROM          --platform=$BUILDPLATFORM $FROM_REGISTRY/$FROM_IMAGE_BUILDER                                              AS builder-main
 
-# Note that this is tied to x86_64 and not a proper multi-arch image
-ARG           VERSION=7.11.1
-ARG           AMD64_SHA512=5facaac7adced5ac2830158d6a7994d9c32e042c320f250626166a9e86cce3fa4c3e8b92809526492b4d09b0b8623ea2c3bfd02751a8f1387bc3f09a1bee642b
-ARG           AARCH64_SHA512=af451e0aab7f3934c733240cd5f84513b54188357de81de9b03f085a84dfc18694af547c5c943632feb13dfce211b2f03bba488b6f475338cc6e15c7cd422c59
+ARG           TARGETPLATFORM
 
-RUN           apt-get update -qq \
-              && apt-get install -qq --no-install-recommends \
-                curl=7.64.0-4+deb10u1
+ARG           VERSION=7.13.4
+ARG           AMD64_SHA512=1accd5d6933f3f2f54174e53da626bc275b99b2f102d5f8cfee934d3520ee55a97c9c545cca32ddffec06a96114ce284e2e128cf334538214566c6530d1d673e
+ARG           ARM64_SHA512=8bead967f8045596a31b12027c76319dccad37ec35bfc775a6543a7801330250c245679bab1e24a8d9f8d4b870e604c0de98ad5ba07f031f80e813fd0e771db3
 
 WORKDIR       /dist/boot
 
-# hadolint ignore=DL4006
-RUN           set -eu; \
+RUN           --mount=type=secret,id=CA \
+              --mount=type=secret,id=CERTIFICATE \
+              --mount=type=secret,id=KEY \
+              --mount=type=secret,id=NETRC \
+              --mount=type=secret,id=.curlrc \
               case "$TARGETPLATFORM" in \
                 "linux/amd64")    arch=x86_64;      checksum=$AMD64_SHA512;      ;; \
-                "linux/arm64")    arch=aarch64;     checksum=$AARCH64_SHA512;     ;; \
+                "linux/arm64")    arch=aarch64;     checksum=$ARM64_SHA512;     ;; \
               esac; \
-              curl --proto '=https' --tlsv1.2 -sSfL -o archive.tgz https://artifacts.elastic.co/downloads/kibana/kibana-"${VERSION}"-linux-"$arch".tar.gz; \
+              curl -sSfL -o archive.tgz https://artifacts.elastic.co/downloads/kibana/kibana-"${VERSION}"-linux-"$arch".tar.gz; \
               printf "Downloaded shasum: %s\n" "$(sha512sum archive.tgz)"; \
               printf "%s *archive.tgz" "$checksum" | sha512sum -c -; \
               tar --strip-components=1 -zxf archive.tgz; \
@@ -90,56 +46,87 @@ RUN           set -eu; \
               rm config/kibana.yml; \
               ln -s /config/kibana/main.yml config/kibana.yml
 
-#######################
-# Builder assembly
-#######################
-# hadolint ignore=DL3006
-FROM          $BUILDER_BASE                                                                                             AS builder
+FROM          --platform=$BUILDPLATFORM fetcher-main                                                                    AS builder-main-build
 
-COPY          --from=builder-healthcheck /dist/boot/bin /dist/boot/bin
-COPY          --from=builder-goello /dist/boot/bin /dist/boot/bin
-COPY          --from=builder-caddy /dist/boot/bin /dist/boot/bin
-COPY          --from=builder-main /dist/boot /dist/boot
+ARG           TARGETARCH
+ARG           TARGETOS
+ARG           TARGETVARIANT
+
+COPY          --from=node /usr/local/bin/node /dist/boot/bin/node
+COPY          --from=node /usr/local/bin/node /dist/boot/bin/nodejs
+COPY          --from=node /usr/local/bin/yarn /dist/boot/bin/yarn
+COPY          --from=node /usr/local/bin/yarn /dist/boot/bin/yarnpkg
+
+ARG           npm_config_arch=$TARGETARCH
+ARG           PATH=$PATH:/dist/boot/bin
+RUN           yarn build --skip-os-packages
+
+# Embark node as well from the builder image
+RUN           ls -lA target; exit 1
+RUN           rm config/kibana.yml; ln -s /config/kibana/main.yml config/kibana.yml
+
+#######################
+# Builder assembly, XXX should be auditor
+#######################
+FROM          --platform=$BUILDPLATFORM $FROM_REGISTRY/$FROM_IMAGE_BUILDER                                              AS builder
+
+COPY          --from=builder-main-build /dist/boot/bin           /dist/boot/bin
+
+COPY          --from=builder-tools  /boot/bin/goello-server  /dist/boot/bin
+COPY          --from=builder-tools  /boot/bin/caddy          /dist/boot/bin
+COPY          --from=builder-tools  /boot/bin/http-health    /dist/boot/bin
 
 RUN           chmod 555 /dist/boot/bin/*; \
               epoch="$(date --date "$BUILD_CREATED" +%s)"; \
-              find /dist/boot/bin -newermt "@$epoch" -exec touch --no-dereference --date="@$epoch" '{}' +;
+              find /dist/boot -newermt "@$epoch" -exec touch --no-dereference --date="@$epoch" '{}' +;
 
 #######################
 # Running image
 #######################
-# hadolint ignore=DL3006
-FROM          $RUNTIME_BASE
+FROM          $FROM_REGISTRY/$FROM_IMAGE_RUNTIME
 
 USER          root
 
-# Using the bundled node for now
-# nodejs=10.21.0~dfsg-1~deb10u1 \
-RUN           apt-get update -qq          && \
+RUN           --mount=type=secret,uid=100,id=CA \
+              --mount=type=secret,uid=100,id=CERTIFICATE \
+              --mount=type=secret,uid=100,id=KEY \
+              --mount=type=secret,uid=100,id=GPG.gpg \
+              --mount=type=secret,id=NETRC \
+              --mount=type=secret,id=APT_SOURCES \
+              --mount=type=secret,id=APT_CONFIG \
+              apt-get update -qq          && \
               apt-get install -qq --no-install-recommends \
-                fontconfig=2.13.1-2 \
-                libfreetype6=2.9.1-3+deb10u1      && \
+                fontconfig=2.13.1-4.2 \
+                libfreetype6=2.10.4+dfsg-1      && \
               apt-get -qq autoremove      && \
               apt-get -qq clean           && \
               rm -rf /var/lib/apt/lists/* && \
               rm -rf /tmp/*               && \
               rm -rf /var/tmp/*
 
+# fonts-liberation=1:1.07.4-11 libfontconfig1=2.13.1-4.2
+
+# xpack.monitoring.ui.container.elasticsearch.enabled: true
+
 USER          dubo-dubon-duponey
 
-# Bring in Kibana from the initial stage.
-COPY          --from=builder --chown=$BUILD_UID:root /dist .
+ENV           ELASTICSEARCH_HOSTS="https://elastic.local:4443"
+ENV           NICK="kibana"
+
+COPY          --from=builder --chown=$BUILD_UID:root /dist /
 
 ### Front server configuration
 # Port to use
 ENV           PORT=4443
 EXPOSE        4443
-# Log verbosity
-ENV           LOG_LEVEL=warn
+# Log verbosity for
+ENV           LOG_LEVEL="warn"
 # Domain name to serve
-ENV           DOMAIN="kibana.local"
+ENV           DOMAIN="$NICK.local"
 # Control wether tls is going to be "internal" (eg: self-signed), or alternatively an email address to enable letsencrypt
 ENV           TLS="internal"
+# Either require_and_verify or verify_if_given
+ENV           MTLS_MODE="verify_if_given"
 
 # Realm in case access is authenticated
 ENV           REALM="My Precious Realm"
@@ -151,11 +138,11 @@ ENV           PASSWORD=""
 # Enable/disable mDNS support
 ENV           MDNS_ENABLED=false
 # Name is used as a short description for the service
-ENV           MDNS_NAME="My Precious mDNS Service"
+ENV           MDNS_NAME="mDNS display name"
 # The service will be annonced and reachable at $MDNS_HOST.local
-ENV           MDNS_HOST=kibana
+ENV           MDNS_HOST="$NICK"
 # Type to advertise
-ENV           MDNS_TYPE=_http._tcp
+ENV           MDNS_TYPE="_http._tcp"
 
 # Caddy certs will be stored here
 VOLUME        /certs
@@ -163,14 +150,9 @@ VOLUME        /certs
 # Caddy uses this
 VOLUME        /tmp
 
-# Elastic data will be stored here
+# Used by the backend service
 VOLUME        /data
 
-ENV           ELASTICSEARCH_HOSTS="https://elastic.local:4443"
+ENV           HEALTHCHECK_URL="http://127.0.0.1:10000/?healthcheck"
 
-# xpack.monitoring.ui.container.elasticsearch.enabled: true
-# This var also enables the corresponding caddy app
-ENV           HEALTHCHECK_URL="http://127.0.0.1:10000/api/status?healthcheck"
-
-# TODO make interval configurable
 HEALTHCHECK   --interval=120s --timeout=30s --start-period=10s --retries=1 CMD http-health || exit 1
