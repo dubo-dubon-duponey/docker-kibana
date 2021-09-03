@@ -24,9 +24,9 @@ FROM          --platform=$BUILDPLATFORM $FROM_REGISTRY/$FROM_IMAGE_BUILDER      
 
 ARG           TARGETPLATFORM
 
-ARG           VERSION=7.13.4
-ARG           AMD64_SHA512=1accd5d6933f3f2f54174e53da626bc275b99b2f102d5f8cfee934d3520ee55a97c9c545cca32ddffec06a96114ce284e2e128cf334538214566c6530d1d673e
-ARG           ARM64_SHA512=8bead967f8045596a31b12027c76319dccad37ec35bfc775a6543a7801330250c245679bab1e24a8d9f8d4b870e604c0de98ad5ba07f031f80e813fd0e771db3
+ARG           VERSION=7.14.0
+ARG           AMD64_SHA512=0ca36be3345bb2cec0739274d8f57b84775ec8f545d26cfc0556b1014c4bc99e0c015d85aa09f0ad105e2181fb2bad449819f6386caad2f2d9402383c5644473
+ARG           ARM64_SHA512=3936653aca2e21d3fe19c2bff79fa2600606fb6684d5220e2e2e019d964d8ca66e839be6ebf24f17def1c431f0130e0aa7babbd9ccddedabfa144a36595bd23a
 
 WORKDIR       /dist/boot
 
@@ -47,7 +47,45 @@ RUN           --mount=type=secret,id=CA \
               rm config/kibana.yml; \
               ln -s /config/kibana/main.yml config/kibana.yml
 
-FROM          --platform=$BUILDPLATFORM fetcher-main                                                                    AS builder-main-build
+
+FROM          --platform=$BUILDPLATFORM node                                                                            AS builder-main-build
+
+ARG           TARGETARCH
+ARG           TARGETOS
+ARG           TARGETVARIANT
+
+COPY          --from=fetcher-main /source .
+
+RUN           --mount=type=secret,uid=100,id=CA \
+              --mount=type=secret,uid=100,id=CERTIFICATE \
+              --mount=type=secret,uid=100,id=KEY \
+              --mount=type=secret,uid=100,id=GPG.gpg \
+              --mount=type=secret,id=NETRC \
+              --mount=type=secret,id=APT_SOURCES \
+              --mount=type=secret,id=APT_CONFIG \
+              apt-get update -qq; apt-get install libatomic1 python --no-install-recommends -qq
+
+ARG           npm_config_arch=$TARGETARCH
+# Remove node engine moronic version restriction
+RUN           sed -Ei 's/  "node": "14[.].+",//g' package.json
+
+RUN           yarn install --production=false
+RUN           yarn build --skip-os-packages
+
+RUN           rm config/kibana.yml; ln -s /config/kibana/main.yml config/kibana.yml
+
+RUN           eval "$(dpkg-architecture -A "$(echo "$TARGETARCH$TARGETVARIANT" | sed -e "s/^armv6$/armel/" -e "s/^armv7$/armhf/" -e "s/^ppc64le$/ppc64el/" -e "s/^386$/i386/")")"; \
+              mkdir -p /dist/boot/lib; \
+              cp /usr/lib/"$DEB_TARGET_MULTIARCH"/libstdc++.so.6   /dist/boot/lib; \
+              mv /opt/* /dist/boot; \
+              mv /usr/local/bin/node /dist/boot/bin/node; \
+              mv /usr/local/bin/nodejs /dist/boot/bin/nodejs; \
+              mv /usr/local/bin/yarn /dist/boot/bin/yarn; \
+              mv /usr/local/bin/yarnpkg /dist/boot/bin/yarnpkg
+
+#              cp /usr/lib/"$DEB_TARGET_MULTIARCH"/libatomic.so.1   /dist/boot/lib; \
+
+FROM          --platform=$BUILDPLATFORM fetcher-main                                                                    AS builder-main-build_xxx
 
 ARG           TARGETARCH
 ARG           TARGETOS
@@ -57,13 +95,28 @@ COPY          --from=node /usr/local/bin/node /dist/boot/bin/node
 COPY          --from=node /usr/local/bin/node /dist/boot/bin/nodejs
 COPY          --from=node /usr/local/bin/yarn /dist/boot/bin/yarn
 COPY          --from=node /usr/local/bin/yarn /dist/boot/bin/yarnpkg
+COPY          --from=node /opt /opt
+COPY          --from=node /opt /dist/opt
+
+# Getting worse by the minute
+COPY          --from=node "/usr/lib" "/tmp/usr/lib"
+
+RUN           eval "$(dpkg-architecture -A "$(echo "$TARGETARCH$TARGETVARIANT" | sed -e "s/^armv6$/armel/" -e "s/^armv7$/armhf/" -e "s/^ppc64le$/ppc64el/" -e "s/^386$/i386/")")"; \
+              mkdir -p /dist/boot/lib; \
+              cp /tmp/usr/lib/"$DEB_TARGET_MULTIARCH"/libstdc++.so.6   /dist/boot/lib; \
+              cp /tmp/usr/lib/"$DEB_TARGET_MULTIARCH"/libstdc++.so.6   /usr/lib/"$DEB_TARGET_MULTIARCH"/libstdc++.so.6
+
+#COPY          --from=node "/usr/lib/x86_64-linux-gnu/libstdc++.so.6" "/usr/lib/x86_64-linux-gnu/libstdc++.so.6"
+#COPY          --from=node "/usr/lib/x86_64-linux-gnu/libstdc++.so.6" /dist/boot/lib
 
 ARG           npm_config_arch=$TARGETARCH
 ARG           PATH=$PATH:/dist/boot/bin
-RUN           yarn build --skip-os-packages
+RUN           sed -Ei 's/  "node": "14[.].+",//g' package.json
+RUN           yarn install --production=false
+RUN           cat package.json; yarn build --skip-os-packages
 
 # Embark node as well from the builder image
-RUN           ls -lA target; exit 1
+#RUN           ls -lA target; exit 1
 RUN           rm config/kibana.yml; ln -s /config/kibana/main.yml config/kibana.yml
 
 #######################
@@ -71,13 +124,16 @@ RUN           rm config/kibana.yml; ln -s /config/kibana/main.yml config/kibana.
 #######################
 FROM          --platform=$BUILDPLATFORM $FROM_REGISTRY/$FROM_IMAGE_AUDITOR                                              AS builder
 
-COPY          --from=builder-main-build /dist/boot/bin           /dist/boot/bin
+COPY          --from=builder-main   /dist/boot/bin           /dist/boot/bin
 
 COPY          --from=builder-tools  /boot/bin/goello-server  /dist/boot/bin
 COPY          --from=builder-tools  /boot/bin/caddy          /dist/boot/bin
 COPY          --from=builder-tools  /boot/bin/http-health    /dist/boot/bin
 
 RUN           setcap 'cap_net_bind_service+ep' /dist/boot/bin/caddy
+
+# RUN           patchelf --set-rpath '$ORIGIN/../lib'           /dist/boot/lib/*
+# RUN           patchelf --set-rpath '$ORIGIN/../lib'           /dist/boot/bin/caddy
 
 RUN           chmod 555 /dist/boot/bin/*; \
               epoch="$(date --date "$BUILD_CREATED" +%s)"; \
