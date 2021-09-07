@@ -124,7 +124,7 @@ RUN           rm config/kibana.yml; ln -s /config/kibana/main.yml config/kibana.
 #######################
 FROM          --platform=$BUILDPLATFORM $FROM_REGISTRY/$FROM_IMAGE_AUDITOR                                              AS builder
 
-COPY          --from=builder-main   /dist/boot/bin           /dist/boot/bin
+COPY          --from=builder-main   /dist/boot           /dist/boot
 
 COPY          --from=builder-tools  /boot/bin/goello-server  /dist/boot/bin
 COPY          --from=builder-tools  /boot/bin/caddy          /dist/boot/bin
