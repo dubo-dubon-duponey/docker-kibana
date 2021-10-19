@@ -2,7 +2,7 @@
 server:
   name: kibana
   host: "0"
-  port: 42042
+  port: 10042
 
 # elasticsearch.hosts: [ "http://elasticsearch:9200" ]
 
