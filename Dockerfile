@@ -45,9 +45,12 @@ RUN           --mount=type=secret,id=CA \
               tar --strip-components=1 -zxf archive.tgz; \
               rm archive.tgz; \
               rm config/kibana.yml; \
+              rm LICENSE.txt; \
+              rm NOTICE.txt; \
+              rm README.txt; \
+              rmdir data; \
+              rmdir plugins; \
               touch config/kibana.yml
-              # ; \
-              # ln -s /config/kibana/main.yml config/kibana.yml
 
 # Giving up on trying to build the shit from source - just too painful
 FROM          --platform=$BUILDPLATFORM node                                                                            AS builder-main-build
@@ -86,8 +89,6 @@ RUN           eval "$(dpkg-architecture -A "$(echo "$TARGETARCH$TARGETVARIANT" |
               mv /usr/local/bin/nodejs /dist/boot/bin/nodejs; \
               mv /usr/local/bin/yarn /dist/boot/bin/yarn; \
               mv /usr/local/bin/yarnpkg /dist/boot/bin/yarnpkg
-
-#              cp /usr/lib/"$DEB_TARGET_MULTIARCH"/libatomic.so.1   /dist/boot/lib; \
 
 FROM          --platform=$BUILDPLATFORM fetcher-main                                                                    AS builder-main-build_xxx
 
