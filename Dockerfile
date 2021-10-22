@@ -45,9 +45,11 @@ RUN           --mount=type=secret,id=CA \
               tar --strip-components=1 -zxf archive.tgz; \
               rm archive.tgz; \
               rm config/kibana.yml; \
-              ln -s /config/kibana/main.yml config/kibana.yml
+              touch config/kibana.yml
+              # ; \
+              # ln -s /config/kibana/main.yml config/kibana.yml
 
-
+# Giving up on trying to build the shit from source - just too painful
 FROM          --platform=$BUILDPLATFORM node                                                                            AS builder-main-build
 
 ARG           TARGETARCH
@@ -119,10 +121,11 @@ RUN           cat package.json; yarn build --skip-os-packages
 
 # Embark node as well from the builder image
 #RUN           ls -lA target; exit 1
-RUN           rm config/kibana.yml; ln -s /config/kibana/main.yml config/kibana.yml
+RUN           rm config/kibana.yml
+# ; ln -s /config/kibana/main.yml config/kibana.yml
 
 #######################
-# Builder assembly, XXX should be auditor
+# Builder assembly
 #######################
 FROM          --platform=$BUILDPLATFORM $FROM_REGISTRY/$FROM_IMAGE_AUDITOR                                              AS assembly
 
@@ -133,9 +136,6 @@ COPY          --from=builder-tools  /boot/bin/caddy          /dist/boot/bin
 COPY          --from=builder-tools  /boot/bin/http-health    /dist/boot/bin
 
 RUN           setcap 'cap_net_bind_service+ep' /dist/boot/bin/caddy
-
-# RUN           patchelf --set-rpath '$ORIGIN/../lib'           /dist/boot/lib/*
-# RUN           patchelf --set-rpath '$ORIGIN/../lib'           /dist/boot/bin/caddy
 
 RUN           RUNNING=true \
               STATIC=true \
@@ -173,8 +173,6 @@ RUN           --mount=type=secret,uid=100,id=CA \
               rm -rf /var/tmp/*
 
 # fonts-liberation=1:1.07.4-11 libfontconfig1=2.13.1-4.2
-
-# xpack.monitoring.ui.container.elasticsearch.enabled: true
 
 USER          dubo-dubon-duponey
 
