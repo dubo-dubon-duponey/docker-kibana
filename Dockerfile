@@ -12,8 +12,10 @@ FROM          $FROM_REGISTRY/$FROM_IMAGE_NODE                                   
 FROM          --platform=$BUILDPLATFORM $FROM_REGISTRY/$FROM_IMAGE_BUILDER                                              AS fetcher-main
 
 ARG           GIT_REPO=github.com/elastic/kibana
-ARG           GIT_VERSION=v7.14.0
-ARG           GIT_COMMIT=f032cf9bdbf6f74b70db5e43b7b1d30f5de22d3e
+#ARG           GIT_VERSION=v7.14.0
+#ARG           GIT_COMMIT=f032cf9bdbf6f74b70db5e43b7b1d30f5de22d3e
+ARG           GIT_VERSION=v7.17.2
+ARG           GIT_COMMIT=07cff2b713ccaea7caa78c054848de6cc2ba0331
 
 RUN           git clone --recurse-submodules https://"$GIT_REPO" .; git checkout "$GIT_COMMIT"
 
@@ -24,9 +26,13 @@ FROM          --platform=$BUILDPLATFORM $FROM_REGISTRY/$FROM_IMAGE_BUILDER      
 
 ARG           TARGETPLATFORM
 
-ARG           VERSION=7.14.0
-ARG           AMD64_SHA512=0ca36be3345bb2cec0739274d8f57b84775ec8f545d26cfc0556b1014c4bc99e0c015d85aa09f0ad105e2181fb2bad449819f6386caad2f2d9402383c5644473
-ARG           ARM64_SHA512=3936653aca2e21d3fe19c2bff79fa2600606fb6684d5220e2e2e019d964d8ca66e839be6ebf24f17def1c431f0130e0aa7babbd9ccddedabfa144a36595bd23a
+#ARG           VERSION=7.14.0
+#ARG           AMD64_SHA512=0ca36be3345bb2cec0739274d8f57b84775ec8f545d26cfc0556b1014c4bc99e0c015d85aa09f0ad105e2181fb2bad449819f6386caad2f2d9402383c5644473
+#ARG           ARM64_SHA512=3936653aca2e21d3fe19c2bff79fa2600606fb6684d5220e2e2e019d964d8ca66e839be6ebf24f17def1c431f0130e0aa7babbd9ccddedabfa144a36595bd23a
+
+ARG           VERSION=7.17.2
+ARG           AMD64_SHA512=a631ff802e8191e0bca4ed8934d4620003e43329968ca4153bff9c9eaba28aeecba5cd940ba48633447d9731051d74a643e828f3ae043a6b301b16fa446f4b94
+ARG           ARM64_SHA512=4e4870324e260569cef7701a542e351d0848a0473d8c27a71531329ede9e66182b899fbc800a69893b696eb058e733665ef6b619148d178ce95c359eef836723
 
 WORKDIR       /dist/boot
 
